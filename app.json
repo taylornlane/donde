@@ -1,18 +1,22 @@
 {
   "expo": {
-    "name": "donde-scaffold",
-    "slug": "donde-scaffold",
-    "version": "1.0.0",
+    "name": "dónde",
+    "slug": "donde",
+    "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "dondescaffold",
+    "scheme": "donde",
     "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "com.taylorlane.donde",
+      "supportsTablet": true
     },
     "android": {
+      "package": "com.taylorlane.donde",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#0B1F2A",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -25,18 +29,25 @@
     },
     "plugins": [
       "expo-router",
+      "expo-dev-client",
+      "expo-sqlite",
+      "@maplibre/maplibre-react-native",
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#0B1F2A",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
-      ]
+      ],
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "referenceDbVersion": 1
     }
   }
 }
