@@ -41,3 +41,8 @@ example
 # generated native folders
 /ios
 /android
+
+# Data pipeline: downloaded source data, cached by URL hash. Regenerable, and
+# ~400MB of GeoNames dumps that have no business in git.
+tools/.cache/
+tools/node_modules/

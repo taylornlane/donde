@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2023"],
+    "types": ["node"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    // tsx runs these files directly, so imports keep their .ts extension the way
+    // Node's own type-stripping expects.
+    "allowImportingTsExtensions": true
+  },
+  "include": ["src/**/*.ts"]
+}

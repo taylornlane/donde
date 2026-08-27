@@ -1,0 +1,36 @@
+/**
+ * The 193 UN member states, plus the two permanent observers (Vatican City and
+ * Palestine) that make up the familiar "195 countries" denominator.
+ *
+ * This was a REST Countries lookup until that API started returning something other
+ * than an array and silently blanked the field. A network call was the wrong tool
+ * regardless: the list has changed once since 2006 (South Sudan, 2011), so it is a
+ * constant, and treating it as one means the headline "x of 195" can never break
+ * because a third-party service had a bad afternoon.
+ *
+ * GeoNames' countryInfo.txt carries ~250 entries — dependencies, territories and
+ * disputed areas included. Everything not in this set is still tickable in the app,
+ * it just counts toward "territories" rather than the sovereign total.
+ */
+
+export const UN_MEMBERS = new Set([
+  'AF','AL','DZ','AD','AO','AG','AR','AM','AU','AT','AZ','BS','BH','BD','BB','BY','BE','BZ','BJ',
+  'BT','BO','BA','BW','BR','BN','BG','BF','BI','CV','KH','CM','CA','CF','TD','CL','CN','CO','KM',
+  'CG','CD','CR','CI','HR','CU','CY','CZ','DK','DJ','DM','DO','EC','EG','SV','GQ','ER','EE','SZ',
+  'ET','FJ','FI','FR','GA','GM','GE','DE','GH','GR','GD','GT','GN','GW','GY','HT','HN','HU','IS',
+  'IN','ID','IR','IQ','IE','IL','IT','JM','JP','JO','KZ','KE','KI','KP','KR','KW','KG','LA','LV',
+  'LB','LS','LR','LY','LI','LT','LU','MG','MW','MY','MV','ML','MT','MH','MR','MU','MX','FM','MD','MC',
+  'MN','ME','MA','MZ','MM','NA','NR','NP','NL','NZ','NI','NE','NG','MK','NO','OM','PK','PW','PA',
+  'PG','PY','PE','PH','PL','PT','QA','RO','RU','RW','KN','LC','VC','WS','SM','ST','SA','SN','RS',
+  'SC','SL','SG','SK','SI','SB','SO','ZA','SS','ES','LK','SD','SR','SE','CH','SY','TJ','TZ','TH',
+  'TL','TG','TO','TT','TN','TR','TM','TV','UG','UA','AE','GB','US','UY','UZ','VU','VE','VN','YE',
+  'ZM','ZW',
+]);
+
+/** Non-member permanent observers. Counted in the 195 alongside the members. */
+export const UN_OBSERVERS = new Set(['VA', 'PS']);
+
+/** True for the 195 states the headline percentage is measured against. */
+export function isSovereign(alpha2: string): boolean {
+  return UN_MEMBERS.has(alpha2) || UN_OBSERVERS.has(alpha2);
+}
