@@ -1,56 +1,52 @@
-# Welcome to your Expo app 👋
+# dónde
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A travel tracker that fills in a world map as you record where you've been.
 
-## Get started
+Two maps: one that shades whole countries, one that shades only the cities you
+actually stood in. Percentages for how much of the world, how much of a country, and
+how much of humanity you've covered. National parks and monuments, the seven wonders,
+and badges. Every place carries a **rarity score**, so going somewhere hard counts
+for more than going somewhere popular.
 
-1. Install dependencies
+Free, no subscription, and it works on a plane.
 
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Quick start
 
 ```bash
-npm run reset-project
+# 1. Build the place catalogue (~1 min, cached after the first run)
+cd tools
+npm install
+NPS_API_KEY=your_key npm run build     # key is optional; parks are skipped without it
+
+# 2. Run the app — needs a native dev build, MapLibre isn't in Expo Go
+cd ..
+npm install
+npx expo run:ios                       # or: npx expo run:android
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+A free NPS API key takes a minute to request from
+[nps.gov/subjects/developer](https://www.nps.gov/subjects/developer/get-started.htm)
+and unlocks the ~470 National Park Service units.
 
-### Other setup steps
+## What's inside
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+| | |
+|---|---|
+| **Catalogue** | 252 countries · 34,124 cities · 21 wonders · NPS units |
+| **Size** | 9.1 MB database + 300 KB of country polygons, all bundled |
+| **Offline** | Everything except street-level detail above zoom 5 |
+| **Stack** | Expo 57 · React Native 0.86 · MapLibre · SQLite + Drizzle |
 
-## Learn more
+## Documentation
 
-To learn more about developing your project with Expo, look at the following resources:
+- [`docs/PLAN.md`](docs/PLAN.md) — roadmap, architecture, and why each choice was made
+- [`docs/ATTRIBUTION.md`](docs/ATTRIBUTION.md) — data sources and their licences
+- [`CLAUDE.md`](CLAUDE.md) — conventions for working in this repo
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## Data
 
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Built from [GeoNames](https://geonames.org) (CC BY 4.0),
+[Natural Earth](https://naturalearthdata.com) (public domain),
+[World Bank Open Data](https://data.worldbank.org) (CC BY 4.0), and the
+[NPS API](https://www.nps.gov/subjects/developer/) (public domain). Map tiles from
+[OpenFreeMap](https://openfreemap.org), © OpenStreetMap contributors.
