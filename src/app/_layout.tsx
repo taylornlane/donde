@@ -51,8 +51,18 @@ export default function RootLayout() {
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="country/[id]" options={{ presentation: 'card', headerShown: true }} />
-        <Stack.Screen name="list/[id]" options={{ presentation: 'card', headerShown: true }} />
+        {/*
+          Without an explicit back title these inherit the route name and the arrow
+          reads "(tabs)". Name the place you came from instead.
+        */}
+        <Stack.Screen
+          name="country/[id]"
+          options={{ presentation: 'card', headerShown: true, headerBackTitle: 'Map' }}
+        />
+        <Stack.Screen
+          name="list/[id]"
+          options={{ presentation: 'card', headerShown: true, headerBackTitle: 'All Lists' }}
+        />
       </Stack>
     </ThemeProvider>
   );
