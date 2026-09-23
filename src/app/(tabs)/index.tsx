@@ -1,9 +1,11 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { MapPalette, type MapColors } from '@/constants/palette';
+import { AccentPicker } from '@/components/accent-picker';
+import type { MapColors } from '@/constants/palette';
+import { useMapColors } from '@/hooks/use-map-colors';
 import { useCatalogue } from '@/lib/catalogue';
 import { WorldMap, type MapMode } from '@/map/WorldMap';
 import { useVisitCount } from '@/stores/visits';
@@ -15,8 +17,8 @@ import { useVisitCount } from '@/stores/visits';
  */
 export default function MapScreen() {
   const [mode, setMode] = useState<MapMode>('countries');
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const colors = MapPalette[scheme];
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const colors = useMapColors();
 
   const visitedCities = useCatalogue((s) => s.visitedCities);
   const countryCount = useVisitCount('country');
@@ -46,14 +48,37 @@ export default function MapScreen() {
           />
         </View>
 
-        <View style={[styles.counter, { backgroundColor: colors.labelHalo }]}>
-          <Text style={[styles.counterText, { color: colors.label }]}>
-            {mode === 'countries'
-              ? `${countryCount} ${countryCount === 1 ? 'country' : 'countries'}`
-              : `${cityCount} ${cityCount === 1 ? 'city' : 'cities'}`}
-          </Text>
+        <View style={styles.underRow}>
+          <View style={[styles.counter, { backgroundColor: colors.labelHalo }]}>
+            <Text style={[styles.counterText, { color: colors.label }]}>
+              {mode === 'countries'
+                ? `${countryCount} ${countryCount === 1 ? 'country' : 'countries'}`
+                : `${cityCount} ${cityCount === 1 ? 'city' : 'cities'}`}
+            </Text>
+          </View>
+
+          {/*
+            The swatch is both the control and its own preview: it shows the current
+            fill, so it needs no label, and it sits next to the map it recolours
+            rather than being buried in a settings screen.
+          */}
+          <Pressable
+            onPress={() => setPickerOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Change map colour"
+            style={[styles.swatchButton, { backgroundColor: colors.labelHalo }]}
+          >
+            <View
+              style={[
+                styles.swatch,
+                { backgroundColor: colors.visited, borderColor: colors.visitedBorder },
+              ]}
+            />
+          </Pressable>
         </View>
       </SafeAreaView>
+
+      <AccentPicker visible={pickerOpen} onClose={() => setPickerOpen(false)} />
     </View>
   );
 }
@@ -113,6 +138,15 @@ const styles = StyleSheet.create({
   },
   switchButton: { paddingVertical: 8, paddingHorizontal: 22, borderRadius: 999 },
   switchLabel: { fontSize: 14, fontWeight: '600' },
+  underRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  swatchButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  swatch: { width: 18, height: 18, borderRadius: 9, borderWidth: 2 },
   counter: {
     paddingVertical: 5,
     paddingHorizontal: 14,

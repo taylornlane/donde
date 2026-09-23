@@ -10,7 +10,7 @@ import { Asset } from 'expo-asset';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, useColorScheme, View } from 'react-native';
 
-import { MapPalette } from '../constants/palette';
+import { useMapColors } from '../hooks/use-map-colors';
 import type { City } from '../db/reference';
 import { useVisitedIds } from '../stores/visits';
 import { baseStyle, placeLabelLayer } from './style';
@@ -40,8 +40,10 @@ type Props = {
  * claims that feature.
  */
 export function WorldMap({ mode, visitedCities, onPressCountry, onViewportChange }: Props) {
+  // The accent comes from the user's setting; the basemap's ocean, land and labels
+  // are fixed per appearance, so the style builder still needs the raw scheme.
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const colors = MapPalette[scheme];
+  const colors = useMapColors();
   const mapRef = useRef<MapRef>(null);
 
   const visitedCountryIds = useVisitedIds('country');

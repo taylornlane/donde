@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
-import { ScrollView, StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { MapPalette, type MapColors } from '@/constants/palette';
+import type { MapColors } from '@/constants/palette';
+import { useMapColors } from '@/hooks/use-map-colors';
 import { evaluateBadges, type BadgeState } from '@/lib/badges';
 import { useCatalogue } from '@/lib/catalogue';
 import { useVisitedIds } from '@/stores/visits';
@@ -15,8 +16,7 @@ const GROUP_TITLES: Record<BadgeState['group'], string> = {
 };
 
 export default function BadgesScreen() {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const colors = MapPalette[scheme];
+  const colors = useMapColors();
 
   const { countries, parks, landmarks, visitedCities } = useCatalogue();
   const visitedCountryIds = useVisitedIds('country');
