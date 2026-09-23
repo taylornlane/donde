@@ -1,9 +1,11 @@
 import { FlashList } from '@shopify/flash-list';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { MapPalette, type MapColors } from '@/constants/palette';
+import type { MapColors } from '@/constants/palette';
+import { VisitDateChip, VisitDateSheet } from '@/components/visit-date-sheet';
+import { useMapColors } from '@/hooks/use-map-colors';
 import { citiesInCountry, type City } from '@/db/reference';
 import { useCatalogue } from '@/lib/catalogue';
 import { countryExploration } from '@/lib/stats';
@@ -18,8 +20,7 @@ import { useVisitedIds, useVisits } from '@/stores/visits';
  */
 export default function CountryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const colors = MapPalette[scheme];
+  const colors = useMapColors();
 
   const country = useCatalogue((s) => s.countries.find((c) => c.id === id));
   const visitedCityIds = useVisitedIds('city');
@@ -89,6 +90,7 @@ export default function CountryScreen() {
 function CityRow({ city, colors }: { city: City; colors: MapColors }) {
   const visited = useVisits((s) => s.byKey.has(`city:${city.id}`));
   const toggle = useVisits((s) => s.toggle);
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
 
   return (
     <Pressable
@@ -104,6 +106,25 @@ function CityRow({ city, colors }: { city: City; colors: MapColors }) {
           {city.population.toLocaleString()} · rarity {city.rarity}
         </Text>
       </View>
+
+      {/* Only offered once somewhere is visited — a date on a place you have not
+          been to would be a plan, and plans belong on a list. */}
+      {visited && (
+        <VisitDateChip
+          kind="city"
+          placeId={city.id}
+          colors={colors}
+          onPress={() => setDatePickerOpen(true)}
+        />
+      )}
+
+      <VisitDateSheet
+        visible={datePickerOpen}
+        kind="city"
+        placeId={city.id}
+        placeName={city.name}
+        onClose={() => setDatePickerOpen(false)}
+      />
       <View
         style={[
           styles.check,

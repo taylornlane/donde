@@ -40,7 +40,7 @@ type VisitsState = {
   toggle: (kind: PlaceKind, placeId: string) => Promise<boolean>;
   setVisited: (kind: PlaceKind, placeId: string, visited: boolean) => Promise<void>;
   setNote: (kind: PlaceKind, placeId: string, note: string | null) => Promise<void>;
-  setYear: (kind: PlaceKind, placeId: string, year: number | null) => Promise<void>;
+  setVisitedOn: (kind: PlaceKind, placeId: string, visitedOn: string | null) => Promise<void>;
 };
 
 const emptyIds = (): IdsByKind =>
@@ -113,14 +113,14 @@ export const useVisits = create<VisitsState>((set, get) => {
 
     setNote: (kind, placeId, note) => patch(kind, placeId, { note }),
 
-    setYear: (kind, placeId, year) => patch(kind, placeId, { firstVisitedYear: year }),
+    setVisitedOn: (kind, placeId, visitedOn) => patch(kind, placeId, { visitedOn }),
   };
 
   /** Shared write path for metadata fields, which only apply to an existing visit. */
   async function patch(
     kind: PlaceKind,
     placeId: string,
-    fields: Partial<Pick<Visit, 'note' | 'firstVisitedYear'>>
+    fields: Partial<Pick<Visit, 'note' | 'visitedOn'>>
   ) {
     const key = keyOf(kind, placeId);
     if (!get().byKey.has(key)) await get().setVisited(kind, placeId, true);
