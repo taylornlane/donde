@@ -11,7 +11,10 @@
     "ios": {
       "icon": "./assets/expo.icon",
       "bundleIdentifier": "com.taylorlane.donde",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.taylorlane.donde",
