@@ -1,19 +1,13 @@
 import { FlashList } from '@shopify/flash-list';
 import { useEffect, useMemo, useState } from 'react';
-import {
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  useColorScheme,
-  View,
-} from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { MapPalette, type MapColors } from '@/constants/palette';
-import { searchCities, type City, type Country } from '@/db/reference';
+import type { MapColors } from '@/constants/palette';
+import { useMapColors } from '@/hooks/use-map-colors';
+import { RarityMeter } from '@/components/rarity-meter';
 import type { PlaceKind } from '@/db/schema';
-import { useCatalogue } from '@/lib/catalogue';
+import { usePlaceSearch, type CitySort } from '@/lib/places';
 import { useVisits } from '@/stores/visits';
 
 type Tab = 'countries' | 'cities' | 'parks' | 'wonders';
@@ -35,57 +29,15 @@ const TABS: { key: Tab; label: string; kind: PlaceKind }[] = [
 export default function SearchScreen() {
   const [tab, setTab] = useState<Tab>('countries');
   const [query, setQuery] = useState('');
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const colors = MapPalette[scheme];
+  const [sort, setSort] = useState<CitySort>('relevance');
+  const colors = useMapColors();
 
-  const { countries, parks, landmarks } = useCatalogue();
-  const cityResults = useCitySearch(tab === 'cities' ? query : '');
-
-  const rows = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const match = (name: string) => !q || name.toLowerCase().includes(q);
-
-    switch (tab) {
-      case 'countries':
-        return countries
-          .filter((c) => match(c.name))
-          .map((c) => ({
-            id: c.id,
-            kind: 'country' as PlaceKind,
-            title: `${c.emoji}  ${c.name}`,
-            subtitle: `${c.continent}${c.capital ? ` · ${c.capital}` : ''}`,
-          }));
-      case 'cities':
-        return cityResults.map((c) => ({
-          id: c.id,
-          kind: 'city' as PlaceKind,
-          title: c.name,
-          subtitle: subtitleForCity(c, countries),
-        }));
-      case 'parks':
-        return parks
-          .filter((p) => match(p.full_name))
-          .map((p) => ({
-            id: p.id,
-            kind: 'park' as PlaceKind,
-            title: p.name,
-            subtitle: `${p.designation}${p.states ? ` · ${p.states}` : ''}`,
-          }));
-      case 'wonders':
-        return landmarks
-          .filter((l) => match(l.name))
-          .map((l) => ({
-            id: l.id,
-            kind: 'landmark' as PlaceKind,
-            title: l.name,
-            subtitle: l.kind.replace('wonder_', '').replace('_', ' '),
-          }));
-    }
-  }, [tab, query, countries, parks, landmarks, cityResults]);
+  const kind = TABS.find((t) => t.key === tab)!.kind;
+  const rows = usePlaceSearch(kind, query, sort);
 
   const emptyMessage =
-    tab === 'cities' && !query.trim()
-      ? 'Search for a city — try a country’s capital, or somewhere you had to look up.'
+    tab === 'cities' && !query.trim() && sort === 'relevance'
+      ? 'Search for a city — or switch to Rarest to browse the obscure end of the map.'
       : 'Nothing matches that.';
 
   return (
@@ -109,17 +61,34 @@ export default function SearchScreen() {
               onPress={() => setTab(t.key)}
               style={[styles.tab, tab === t.key && { backgroundColor: colors.visited }]}
             >
-              <Text
-                style={[
-                  styles.tabLabel,
-                  { color: tab === t.key ? '#fff' : colors.label },
-                ]}
-              >
+              <Text style={[styles.tabLabel, { color: tab === t.key ? '#fff' : colors.label }]}>
                 {t.label}
               </Text>
             </Pressable>
           ))}
         </View>
+
+        {/* Sorting by rarity only means anything for cities — countries, parks and
+            wonders are short, fixed lists where the order is not the interesting part. */}
+        {tab === 'cities' && (
+          <View style={styles.sortRow}>
+            {(['relevance', 'rarest'] as CitySort[]).map((option) => (
+              <Pressable key={option} onPress={() => setSort(option)} hitSlop={6}>
+                <Text
+                  style={[
+                    styles.sortLabel,
+                    {
+                      color: sort === option ? colors.visited : colors.label,
+                      opacity: sort === option ? 1 : 0.5,
+                    },
+                  ]}
+                >
+                  {option === 'relevance' ? 'Best match' : 'Rarest first'}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
       </View>
 
       <FlashList
@@ -132,6 +101,7 @@ export default function SearchScreen() {
             kind={item.kind}
             title={item.title}
             subtitle={item.subtitle}
+            rarity={item.rarity}
           />
         )}
         ListEmptyComponent={
@@ -151,14 +121,15 @@ function ResultRow({
   kind,
   title,
   subtitle,
+  rarity,
 }: {
   id: string;
   kind: PlaceKind;
   title: string;
   subtitle: string;
+  rarity?: number;
 }) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const colors = MapPalette[scheme];
+  const colors = useMapColors();
   const visited = useVisits((s) => s.byKey.has(`${kind}:${id}`));
   const toggle = useVisits((s) => s.toggle);
 
@@ -176,6 +147,7 @@ function ResultRow({
         <Text style={[styles.rowSubtitle, { color: colors.label }]} numberOfLines={1}>
           {subtitle}
         </Text>
+        {rarity !== undefined && <RarityMeter rarity={rarity} colors={colors} />}
       </View>
       <View
         style={[
@@ -192,47 +164,6 @@ function ResultRow({
   );
 }
 
-/**
- * Debounced FTS lookup. 180ms is short enough to feel live while still collapsing a
- * fast typist's keystrokes into one query rather than eight.
- */
-function useCitySearch(query: string): City[] {
-  const [results, setResults] = useState<City[]>([]);
-
-  useEffect(() => {
-    const term = query.trim();
-    if (!term) {
-      setResults([]);
-      return;
-    }
-
-    let cancelled = false;
-    const timer = setTimeout(() => {
-      searchCities(term)
-        .then((rows) => {
-          if (!cancelled) setResults(rows);
-        })
-        .catch((err) => console.warn('City search failed', err));
-    }, 180);
-
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [query]);
-
-  return results;
-}
-
-/** "Kyoto · Japan · rarity 34" — the country matters most for disambiguation. */
-function subtitleForCity(city: City, countries: Country[]): string {
-  const country = countries.find((c) => c.id === city.country_id);
-  const parts = [country ? `${country.emoji} ${country.name}` : city.country_id];
-  if (city.admin1_name) parts.push(city.admin1_name);
-  parts.push(`rarity ${city.rarity}`);
-  return parts.join(' · ');
-}
-
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   header: { paddingHorizontal: 16, paddingBottom: 8, gap: 10 },
@@ -243,6 +174,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   tabs: { flexDirection: 'row', gap: 6 },
+  sortRow: { flexDirection: 'row', gap: 16, paddingTop: 2 },
+  sortLabel: { fontSize: 13, fontWeight: '600' },
   tab: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 999 },
   tabLabel: { fontSize: 13, fontWeight: '600' },
   row: {

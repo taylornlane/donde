@@ -176,6 +176,34 @@ export function searchCities(query: string, limit = 40): Promise<City[]> {
   );
 }
 
+/**
+ * The same FTS search, ordered by rarity instead of relevance — "show me the
+ * obscure ones". A population floor keeps the results to places you could plausibly
+ * plan a trip around: without it the top of the list is hamlets in the Sahel that
+ * happen to clear the 15,000 threshold, which is technically correct and useless.
+ */
+export function searchCitiesByRarity(query: string, limit = 40): Promise<City[]> {
+  const term = toFtsPrefixQuery(query);
+  if (!term) return Promise.resolve([]);
+  return ref().getAllAsync<City>(
+    `SELECT c.* FROM cities_fts f
+     JOIN cities c ON c.rowid = f.rowid
+     WHERE cities_fts MATCH ? AND c.population >= 50000
+     ORDER BY c.rarity DESC, c.population DESC
+     LIMIT ?`,
+    [term, limit]
+  );
+}
+
+/** Browse the rarest places overall, for when you have no particular search in mind. */
+export function rarestCities(limit = 60, minPopulation = 100000): Promise<City[]> {
+  return ref().getAllAsync<City>(
+    `SELECT * FROM cities WHERE population >= ?
+     ORDER BY rarity DESC, population DESC LIMIT ?`,
+    [minPopulation, limit]
+  );
+}
+
 export function searchCountries(query: string, limit = 20): Promise<Country[]> {
   const like = `%${query.trim()}%`;
   return ref().getAllAsync<Country>(

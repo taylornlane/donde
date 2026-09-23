@@ -1,7 +1,8 @@
-import { ScrollView, StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { MapPalette, type MapColors } from '@/constants/palette';
+import type { MapColors } from '@/constants/palette';
+import { useMapColors } from '@/hooks/use-map-colors';
 import { useCatalogue } from '@/lib/catalogue';
 import {
   byContinent,
@@ -14,11 +15,12 @@ import {
   wonderProgress,
   type Percentage,
 } from '@/lib/stats';
-import { useVisitedIds } from '@/stores/visits';
+import { busiestYear, byMonth, byYear } from '@/lib/dates';
+import { bandDistribution, comparisonLine, rarityBand } from '@/lib/rarity';
+import { useVisitedIds, useVisits } from '@/stores/visits';
 
 export default function StatsScreen() {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const colors = MapPalette[scheme];
+  const colors = useMapColors();
 
   const { countries, parks, landmarks, visitedCities } = useCatalogue();
   const visitedCountries = useVisitedIds('country');
@@ -32,6 +34,16 @@ export default function StatsScreen() {
   const score = explorerScore(visitedCities);
   const wonders = wonderProgress(landmarks, visitedLandmarks);
   const npsProgress = parkProgress(parks, visitedParks);
+
+  // Every visit row, not just ids — the year breakdown needs the dates on them.
+  const allVisits = useVisits((s) => s.byKey);
+  const { years, undated } = byYear([...allVisits.values()]);
+  const months = byMonth([...allVisits.values()]);
+  const busiest = busiestYear(years);
+  const peakMonth = Math.max(...months);
+
+  const bands = bandDistribution(visitedCities);
+  const comparison = comparisonLine(visitedCities);
 
   return (
     <SafeAreaView edges={['top']} style={styles.fill}>
@@ -60,18 +72,37 @@ export default function StatsScreen() {
           <Stat label="Cities" value={`${visitedCities.length}`} colors={colors} />
         </Section>
 
-        <Section title="Explorer score" colors={colors}>
+        <Section title="How you travel" colors={colors}>
           <Stat
             label={explorerTier(score.average)}
             value={`${score.average}`}
-            hint="average rarity across your cities — 100 is the most obscure place we know"
+            hint="your average rarity — 100 is the least-visited place we know of"
             colors={colors}
           />
+
+          {comparison && (
+            <Text style={[styles.hint, { color: colors.label }]}>{comparison}</Text>
+          )}
+
+          {/* The distribution is the honest version of a single score: it shows
+              whether an average of 45 means everywhere is middling, or that half
+              your trips are Paris and half are the Sahel. */}
+          {visitedCities.length > 0 &&
+            bands.map(({ band, count, fraction }) => (
+              <Bar
+                key={band.key}
+                label={band.label}
+                value={`${count}`}
+                fraction={fraction}
+                colors={colors}
+              />
+            ))}
+
           {score.rarest && (
             <Stat
               label="Rarest place you've been"
               value={score.rarest.name}
-              hint={`rarity ${score.rarest.rarity}`}
+              hint={rarityBand(score.rarest.rarity).blurb}
               colors={colors}
             />
           )}
@@ -117,6 +148,65 @@ export default function StatsScreen() {
             </>
           )}
         </Section>
+
+        <Section title="By year" colors={colors}>
+          {years.length === 0 ? (
+            <Text style={[styles.hint, { color: colors.label }]}>
+              Add dates to your visits and they’ll break down by year here. Tap the
+              “+ date” beside anywhere you’ve been.
+            </Text>
+          ) : (
+            <>
+              {busiest && (
+                <Stat
+                  label="Busiest year"
+                  value={`${busiest.year}`}
+                  hint={`${busiest.total} places`}
+                  colors={colors}
+                />
+              )}
+              {years.map((y) => (
+                <Bar
+                  key={y.year}
+                  label={`${y.year}`}
+                  value={`${y.total}`}
+                  fraction={busiest ? y.total / busiest.total : 0}
+                  colors={colors}
+                />
+              ))}
+              {undated > 0 && (
+                <Text style={[styles.hint, { color: colors.label }]}>
+                  {undated} {undated === 1 ? 'visit has' : 'visits have'} no date yet.
+                </Text>
+              )}
+            </>
+          )}
+        </Section>
+
+        {peakMonth > 0 && (
+          <Section title="When you travel" colors={colors}>
+            <View style={styles.monthRow}>
+              {months.map((count, i) => (
+                <View key={i} style={styles.monthCol}>
+                  <View style={styles.monthBarTrack}>
+                    <View
+                      style={[
+                        styles.monthBarFill,
+                        {
+                          backgroundColor: count > 0 ? colors.visited : 'transparent',
+                          height: `${(count / peakMonth) * 100}%`,
+                        },
+                      ]}
+                    />
+                  </View>
+                  <Text style={[styles.monthLabel, { color: colors.label }]}>
+                    {MONTH_INITIALS[i]}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </Section>
+        )}
 
         <Section title="Wonders" colors={colors}>
           <Bar label="New7Wonders" value={fmtOf(wonders.modern)} fraction={wonders.modern.pct / 100} colors={colors} />
@@ -225,6 +315,8 @@ function Bar({
   );
 }
 
+const MONTH_INITIALS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
+
 const fmtPct = (n: number) => (n >= 10 || n === 0 ? `${Math.round(n)}%` : `${n.toFixed(1)}%`);
 const fmtOf = (p: Percentage) => `${p.done}/${p.total}`;
 
@@ -243,6 +335,12 @@ const styles = StyleSheet.create({
   statLabel: { fontSize: 15, fontWeight: '500' },
   statValue: { fontSize: 17, fontWeight: '700' },
   hint: { fontSize: 12, opacity: 0.55 },
+  monthRow: { flexDirection: 'row', justifyContent: 'space-between', height: 90, gap: 4 },
+  monthCol: { flex: 1, alignItems: 'center', gap: 5 },
+  // Bars grow from the bottom, so the column is a fixed-height box filled upward.
+  monthBarTrack: { flex: 1, width: '100%', justifyContent: 'flex-end' },
+  monthBarFill: { width: '100%', borderRadius: 3, minHeight: 2 },
+  monthLabel: { fontSize: 10, opacity: 0.55 },
   bar: { gap: 6 },
   barHeader: { flexDirection: 'row', justifyContent: 'space-between' },
   barValue: { fontSize: 13, opacity: 0.6, fontVariant: ['tabular-nums'] },
