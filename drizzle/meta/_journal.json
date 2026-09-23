@@ -8,6 +8,34 @@
       "when": 1787866303418,
       "tag": "0000_init",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1790206512127,
+      "tag": "0001_add_lists",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1790206522398,
+      "tag": "0002_drop_wishlist",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1790206780879,
+      "tag": "0003_visit_dates",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1790206781836,
+      "tag": "0004_drop_visit_year",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,1 @@
+ALTER TABLE `visits` ADD `visited_on` text;
