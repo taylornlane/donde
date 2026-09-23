@@ -7,7 +7,7 @@ import type { MapColors } from '@/constants/palette';
 import type { PlaceKind } from '@/db/schema';
 import { useMapColors } from '@/hooks/use-map-colors';
 import { usePlaceSearch, useResolvedPlaces, type PlaceInfo } from '@/lib/places';
-import { useLists } from '@/stores/lists';
+import { useListItems, useLists } from '@/stores/lists';
 import { useVisits } from '@/stores/visits';
 
 const KINDS: { key: PlaceKind; label: string }[] = [
@@ -30,7 +30,7 @@ export default function ListScreen() {
   const colors = useMapColors();
 
   const list = useLists((s) => s.lists.find((l) => l.id === listId));
-  const items = useLists((s) => s.itemsByList.get(listId) ?? []);
+  const items = useListItems(listId);
   const removePlace = useLists((s) => s.removePlace);
   const deleteList = useLists((s) => s.deleteList);
 
@@ -51,7 +51,8 @@ export default function ListScreen() {
         style: 'destructive',
         onPress: async () => {
           await deleteList(listId);
-          router.back();
+          if (router.canGoBack()) router.back();
+          else router.replace('/lists');
         },
       },
     ]);

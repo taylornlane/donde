@@ -13,7 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { MapColors } from '@/constants/palette';
 import { useMapColors } from '@/hooks/use-map-colors';
-import { useLists } from '@/stores/lists';
+import { useListItems, useLists } from '@/stores/lists';
 import { useVisits } from '@/stores/visits';
 
 /** A small spread rather than a full picker — enough to tell lists apart at a glance. */
@@ -59,7 +59,7 @@ export default function ListsScreen() {
  */
 function ListCard({ id, colors }: { id: number; colors: MapColors }) {
   const list = useLists((s) => s.lists.find((l) => l.id === id));
-  const items = useLists((s) => s.itemsByList.get(id) ?? []);
+  const items = useListItems(id);
   const byKey = useVisits((s) => s.byKey);
 
   if (!list) return null;

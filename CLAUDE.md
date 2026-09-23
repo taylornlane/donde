@@ -36,9 +36,13 @@ the stale copy — that version number is what triggers the re-copy at launch.
 `user.db` holds visits and must survive forever. Cross-referencing happens in JS
 against the in-memory visit set, which is why `useVisits` holds everything resident.
 
-**Derived state is computed at write time, not in selectors.** `idsByKind` in the
-visits store is built inside `commit()`. Returning a fresh `Set` from a Zustand
-selector would make every snapshot compare unequal and re-render the map forever.
+**Never return a fresh array, object or Set from a Zustand selector.** Zustand
+compares snapshots by reference, so a new value each call means an infinite render
+loop — React reports it as "The result of getSnapshot should be cached". This has
+bitten twice: `idsByKind` is built inside the visits store's `commit()` for this
+reason, and `useListItems` exists so screens never write `itemsByList.get(id) ?? []`
+inline. Derive at write time, or return a stable constant. Selectors returning a
+primitive (a `.size`, a `.has()`, a `.some()`) are always safe.
 
 **Map fills are driven by layer filters, not by mutating source data.** Two fill
 layers, one filtered to the visited set. Regenerating the GeoJSON on each toggle
