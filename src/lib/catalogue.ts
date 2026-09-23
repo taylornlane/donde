@@ -12,6 +12,8 @@ import {
   type Landmark,
   type Park,
 } from '../db/reference';
+import { useLists } from '../stores/lists';
+import { useSettings } from '../stores/settings';
 import { useVisits } from '../stores/visits';
 
 /**
@@ -72,7 +74,11 @@ export const useCatalogue = create<CatalogueState>((set, get) => ({
  * city set and re-query whenever it changes.
  */
 export async function bootstrap() {
+  // Settings first, and awaited: the accent decides what colour the map paints its
+  // fills, so loading it after the first render would flash the default orange.
+  await useSettings.getState().load();
   await useVisits.getState().load();
+  await useLists.getState().load();
   await useCatalogue.getState().load();
 
   useVisits.subscribe((state, prev) => {

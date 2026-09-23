@@ -18,6 +18,10 @@ export default function TabsLayout() {
         options={{ title: 'Add', tabBarIcon: icon('magnifyingglass', '🔍') }}
       />
       <Tabs.Screen
+        name="lists"
+        options={{ title: 'Lists', tabBarIcon: icon('checklist', '✓') }}
+      />
+      <Tabs.Screen
         name="stats"
         options={{ title: 'Stats', tabBarIcon: icon('chart.bar.fill', '📊') }}
       />

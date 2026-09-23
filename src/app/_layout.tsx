@@ -52,6 +52,7 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="country/[id]" options={{ presentation: 'card', headerShown: true }} />
+        <Stack.Screen name="list/[id]" options={{ presentation: 'card', headerShown: true }} />
       </Stack>
     </ThemeProvider>
   );
