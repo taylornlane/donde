@@ -1,14 +1,15 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AccentPicker } from '@/components/accent-picker';
 import type { MapColors } from '@/constants/palette';
 import { useMapColors } from '@/hooks/use-map-colors';
+import { citiesInBounds, type City } from '@/db/reference';
 import { useCatalogue } from '@/lib/catalogue';
 import { WorldMap, type MapMode } from '@/map/WorldMap';
-import { useVisitCount } from '@/stores/visits';
+import { useVisitCount, useVisits } from '@/stores/visits';
 
 /**
  * The home screen: one map, two lenses, switched by the segmented control that sits
@@ -23,13 +24,19 @@ export default function MapScreen() {
   const visitedCities = useCatalogue((s) => s.visitedCities);
   const countryCount = useVisitCount('country');
   const cityCount = useVisitCount('city');
+  const toggle = useVisits((s) => s.toggle);
+
+  const nearbyCities = useNearbyCities();
 
   return (
     <View style={styles.fill}>
       <WorldMap
         mode={mode}
         visitedCities={visitedCities}
+        nearbyCities={nearbyCities.cities}
         onPressCountry={(id) => router.push(`/country/${id}`)}
+        onPressCity={(id) => toggle('city', id)}
+        onViewportChange={nearbyCities.onViewportChange}
       />
 
       <SafeAreaView edges={['top']} style={styles.overlay} pointerEvents="box-none">
@@ -81,6 +88,53 @@ export default function MapScreen() {
       <AccentPicker visible={pickerOpen} onClose={() => setPickerOpen(false)} />
     </View>
   );
+}
+
+/**
+ * Loads the cities inside the current viewport so they can be browsed and ticked off.
+ *
+ * Debounced, because a pan fires a viewport change at the end of every gesture and a
+ * flick produces several in a row. Requests are also sequence-checked: SQLite can
+ * return an earlier query after a later one, and without the guard a fast pan leaves
+ * the map showing cities from a region you have already left.
+ */
+function useNearbyCities() {
+  const [cities, setCities] = useState<City[]>([]);
+  const bounds = useRef<{ north: number; south: number; east: number; west: number } | null>(null);
+  const sequence = useRef(0);
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    const current = bounds.current;
+    if (!current) return;
+
+    // A whole-world viewport would match all 34k cities; the map only draws them
+    // past zoom 4.5 anyway, so skip the query entirely when zoomed out.
+    const span = Math.max(current.north - current.south, Math.abs(current.east - current.west));
+    if (span > 60) {
+      setCities([]);
+      return;
+    }
+
+    const id = ++sequence.current;
+    const timer = setTimeout(() => {
+      citiesInBounds(current, 250)
+        .then((rows) => {
+          if (id === sequence.current) setCities(rows);
+        })
+        .catch((err) => console.warn('Nearby city lookup failed', err));
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [tick]);
+
+  return {
+    cities,
+    onViewportChange: (next: { north: number; south: number; east: number; west: number }) => {
+      bounds.current = next;
+      setTick((t) => t + 1);
+    },
+  };
 }
 
 function ModeButton({

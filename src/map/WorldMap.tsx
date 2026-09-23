@@ -21,9 +21,19 @@ type Props = {
   mode: MapMode;
   /** Cities the user has visited, already resolved from the catalogue. */
   visitedCities: City[];
+  /** Cities in the current viewport, visited or not — the browse layer. */
+  nearbyCities?: City[];
   onPressCountry?: (countryId: string) => void;
+  onPressCity?: (cityId: string) => void;
   onViewportChange?: (bounds: { north: number; south: number; east: number; west: number }) => void;
 };
+
+/**
+ * Below this, individual cities are meaningless specks and the labels collide into
+ * mush. Above it the map becomes a browsing tool: the thing you pan around to
+ * remember where you've been.
+ */
+const CITY_BROWSE_MINZOOM = 4.5;
 
 /**
  * The two maps the app is built around.
@@ -39,7 +49,14 @@ type Props = {
  * polygons to the renderer — it flips which of two already-uploaded fill layers
  * claims that feature.
  */
-export function WorldMap({ mode, visitedCities, onPressCountry, onViewportChange }: Props) {
+export function WorldMap({
+  mode,
+  visitedCities,
+  nearbyCities = [],
+  onPressCountry,
+  onPressCity,
+  onViewportChange,
+}: Props) {
   // The accent comes from the user's setting; the basemap's ocean, land and labels
   // are fixed per appearance, so the style builder still needs the raw scheme.
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
@@ -67,6 +84,24 @@ export function WorldMap({ mode, visitedCities, onPressCountry, onViewportChange
     [visitedCities]
   );
 
+  // Only the ones not already visited — the visited set has its own filled layer,
+  // and drawing a city twice makes the hollow ring peek out from behind the dot.
+  const visitedCityIds = useVisitedIds('city');
+  const nearbyFeatures = useMemo(
+    () => ({
+      type: 'FeatureCollection' as const,
+      features: nearbyCities
+        .filter((c) => !visitedCityIds.has(c.id))
+        .map((c) => ({
+          type: 'Feature' as const,
+          id: c.id,
+          properties: { id: c.id, name: c.name, rarity: c.rarity },
+          geometry: { type: 'Point' as const, coordinates: [c.lng, c.lat] },
+        })),
+    }),
+    [nearbyCities, visitedCityIds]
+  );
+
   const style = useMemo(() => baseStyle(scheme), [scheme]);
   const labels = useMemo(() => placeLabelLayer(scheme), [scheme]);
 
@@ -78,10 +113,32 @@ export function WorldMap({ mode, visitedCities, onPressCountry, onViewportChange
       style={styles.fill}
       mapStyle={style}
       onPress={async (event) => {
+        const [x, y] = event.nativeEvent.point;
+
+        // A finger is far bigger than a 5px dot, so query a box around the touch
+        // rather than the exact pixel — without this, city taps almost never land.
+        const TOUCH_SLOP = 14;
+        const cityHits = await mapRef.current?.queryRenderedFeatures(
+          [
+            [x - TOUCH_SLOP, y - TOUCH_SLOP],
+            [x + TOUCH_SLOP, y + TOUCH_SLOP],
+          ],
+          { layers: ['city-nearby', 'city-dot'] }
+        );
+
+        const city = cityHits?.[0]?.properties?.id;
+        if (city && onPressCity) {
+          onPressCity(String(city));
+          return;
+        }
+
+        // Nothing city-shaped under the finger, so treat it as a country tap.
         if (!onPressCountry) return;
-        const features = (event.nativeEvent as any).features;
-        const hit = features?.find((f: any) => f?.properties?.id);
-        if (hit) onPressCountry(hit.properties.id);
+        const countryHits = await mapRef.current?.queryRenderedFeatures([x, y], {
+          layers: ['country-base'],
+        });
+        const country = countryHits?.[0]?.properties?.id;
+        if (country) onPressCountry(String(country));
       }}
       // Fires once the gesture settles rather than on every frame of a pan, so a
       // viewport query runs once per movement instead of sixty times a second.
@@ -125,12 +182,74 @@ export function WorldMap({ mode, visitedCities, onPressCountry, onViewportChange
           }}
         />
 
+        {/*
+          Country names, from the `name` property the pipeline now carries. Fades out
+          at the zoom where the basemap's own place labels take over, so the two label
+          sets never fight for the same space.
+        */}
+        <Layer
+          id="country-label"
+          type="symbol"
+          maxzoom={5}
+          layout={{
+            'text-field': ['get', 'name'],
+            'text-font': ['Noto Sans Regular'],
+            'text-size': ['interpolate', ['linear'], ['zoom'], 1.5, 9, 4, 14],
+            'text-max-width': 7,
+          }}
+          paint={{
+            'text-color': colors.label,
+            'text-halo-color': colors.labelHalo,
+            'text-halo-width': 1.4,
+            'text-opacity': ['interpolate', ['linear'], ['zoom'], 1.2, 0, 2, 1, 4.5, 1, 5, 0],
+          }}
+        />
+
         <Layer
           id="country-outline"
           type="line"
           paint={{
             'line-color': colors.unvisitedBorder,
             'line-width': ['interpolate', ['linear'], ['zoom'], 1, 0.3, 6, 1],
+          }}
+        />
+      </GeoJSONSource>
+
+      <GeoJSONSource id="nearby-cities" data={nearbyFeatures}>
+        {/*
+          Hollow rather than filled: an unvisited city should read as an outline
+          waiting to be filled in, which is the same visual language as the
+          unvisited countries behind it.
+        */}
+        <Layer
+          id="city-nearby"
+          type="circle"
+          minzoom={CITY_BROWSE_MINZOOM}
+          paint={{
+            'circle-color': 'transparent',
+            'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 3.5, 10, 6, 14, 9],
+            'circle-stroke-color': colors.visitedBorder,
+            'circle-stroke-width': 1.5,
+            'circle-stroke-opacity': 0.75,
+          }}
+        />
+        <Layer
+          id="city-nearby-label"
+          type="symbol"
+          minzoom={CITY_BROWSE_MINZOOM + 1}
+          layout={{
+            'text-field': ['get', 'name'],
+            'text-font': ['Noto Sans Regular'],
+            'text-size': 11,
+            'text-anchor': 'left',
+            'text-offset': [0.7, 0],
+            'text-optional': true,
+          }}
+          paint={{
+            'text-color': colors.label,
+            'text-halo-color': colors.labelHalo,
+            'text-halo-width': 1.2,
+            'text-opacity': 0.85,
           }}
         />
       </GeoJSONSource>
@@ -159,6 +278,25 @@ export function WorldMap({ mode, visitedCities, onPressCountry, onViewportChange
             'circle-radius': ['interpolate', ['linear'], ['zoom'], 1, 2, 6, 4.5, 12, 10],
             'circle-stroke-color': colors.visitedBorder,
             'circle-stroke-width': 0.5,
+          }}
+        />
+
+        <Layer
+          id="city-dot-label"
+          type="symbol"
+          minzoom={CITY_BROWSE_MINZOOM + 1}
+          layout={{
+            visibility: mode === 'cities' ? 'visible' : 'none',
+            'text-field': ['get', 'name'],
+            'text-font': ['Noto Sans Regular'],
+            'text-size': 11,
+            'text-anchor': 'left',
+            'text-offset': [0.8, 0],
+          }}
+          paint={{
+            'text-color': colors.visited,
+            'text-halo-color': colors.labelHalo,
+            'text-halo-width': 1.3,
           }}
         />
       </GeoJSONSource>

@@ -46,12 +46,21 @@ async function main() {
   const features = [];
   let skipped = 0;
   for (const f of source.features) {
-    const id = isoOf(f.properties ?? {});
+    const props = f.properties ?? {};
+    const id = isoOf(props);
     if (!id) {
       skipped++;
       continue;
     }
-    features.push({ type: 'Feature', properties: { id }, geometry: f.geometry });
+    // The name rides along so the map can label countries from this same source.
+    // MapLibre places a symbol layer on a polygon at its pole of inaccessibility —
+    // the point furthest from any edge — which lands the label inside the country
+    // even for awkward shapes like Norway or Chile, with no label coordinates.
+    features.push({
+      type: 'Feature',
+      properties: { id, name: props.NAME_EN ?? props.NAME ?? id },
+      geometry: f.geometry,
+    });
   }
 
   console.log(`  ${features.length} features (${skipped} without a usable ISO code)`);
