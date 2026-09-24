@@ -173,19 +173,26 @@ export const BADGES: BadgeDef[] = [
     emoji: '🌲',
     group: 'collection',
     progress: (ctx) => ({
-      current: ctx.parks.filter((p) => p.is_national_park === 1 && ctx.visitedParkIds.has(p.id)).length,
+      current: ctx.parks
+        .filter((p) => p.is_national_park >= 1 && ctx.visitedParkIds.has(p.id))
+        .reduce((sum, p) => sum + p.is_national_park, 0),
       target: 10,
     }),
   },
   {
     code: 'park-completionist',
     name: 'The Full 63',
-    description: 'Visit every US National Park.',
+    description: 'Visit all 63 US National Parks.',
     emoji: '🦬',
     group: 'collection',
     progress: (ctx) => {
-      const all = ctx.parks.filter((p) => p.is_national_park === 1);
-      return { current: all.filter((p) => ctx.visitedParkIds.has(p.id)).length, target: all.length };
+      const all = ctx.parks.filter((p) => p.is_national_park >= 1);
+      return {
+        current: all
+          .filter((p) => ctx.visitedParkIds.has(p.id))
+          .reduce((sum, p) => sum + p.is_national_park, 0),
+        target: all.reduce((sum, p) => sum + p.is_national_park, 0),
+      };
     },
   },
   {

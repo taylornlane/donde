@@ -101,10 +101,19 @@ export function countryExploration(
 }
 
 export function parkProgress(parks: Park[], visited: Set<string>) {
-  const nationalParks = parks.filter((p) => p.is_national_park === 1);
+  const nationalParks = parks.filter((p) => p.is_national_park >= 1);
   const monuments = parks.filter((p) => p.is_monument === 1);
+
+  // Summed rather than counted: Sequoia & Kings Canyon is one NPS unit but two of
+  // the 63, so counting units would report the total as 62 and quietly make the
+  // familiar number wrong.
+  const npTotal = nationalParks.reduce((sum, p) => sum + p.is_national_park, 0);
+  const npDone = nationalParks
+    .filter((p) => visited.has(p.id))
+    .reduce((sum, p) => sum + p.is_national_park, 0);
+
   return {
-    nationalParks: pct(nationalParks.filter((p) => visited.has(p.id)).length, nationalParks.length),
+    nationalParks: { done: npDone, total: npTotal, pct: npTotal > 0 ? (npDone / npTotal) * 100 : 0 },
     monuments: pct(monuments.filter((p) => visited.has(p.id)).length, monuments.length),
     allUnits: pct(parks.filter((p) => visited.has(p.id)).length, parks.length),
   };

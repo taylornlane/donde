@@ -293,6 +293,22 @@ async function loadCities(db: Database.Database, countries: Map<string, CountryR
   console.log(`  ${count} cities`);
 }
 
+/**
+ * The NPS API's `designation` field does not reliably identify the 63 National
+ * Parks, so these three units are corrected by hand. The value is how many of the
+ * 63 the unit represents — normally one, but Sequoia & Kings Canyon is a single
+ * administrative unit covering two parks.
+ *
+ * An exceptions table rather than a hardcoded list of all 62 codes: the regex gets
+ * 59 right on its own and keeps working if a new park is designated properly, which
+ * is the common case. Only the oddities need maintaining.
+ */
+const NATIONAL_PARK_EXCEPTIONS: Record<string, number> = {
+  redw: 1, // "National and State Parks" — jointly administered with California.
+  seki: 2, // One unit, two parks: Sequoia and Kings Canyon.
+  npsa: 1, // National Park of American Samoa — designation is empty in the API.
+};
+
 async function loadParks(db: Database.Database) {
   const key = process.env.NPS_API_KEY;
   if (!key) {
@@ -328,9 +344,13 @@ async function loadParks(db: Database.Database) {
           states: p.states ?? '',
           lat: Number(p.latitude) || 0,
           lng: Number(p.longitude) || 0,
-          // "National Park" and "National Park & Preserve" both count toward the 63;
-          // "National Historical Park" must not, hence the anchored match.
-          is_national_park: /^National Park( & Preserve)?$/.test(designation) ? 1 : 0,
+          // Holds a count, not a boolean: 0 for anything that is not one of the 63,
+          // 1 normally, and 2 for the one unit that covers two parks.
+          is_national_park:
+            NATIONAL_PARK_EXCEPTIONS[p.parkCode] ??
+            // "National Park" and "National Park & Preserve" both count toward the
+            // 63; "National Historical Park" must not, hence the anchored match.
+            (/^National Park( & Preserve)?$/.test(designation) ? 1 : 0),
           is_monument: /National Monument/.test(designation) ? 1 : 0,
         });
         count++;

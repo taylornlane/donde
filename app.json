@@ -50,7 +50,7 @@
       "reactCompiler": true
     },
     "extra": {
-      "referenceDbVersion": 1,
+      "referenceDbVersion": 2,
       "eas": {
         "projectId": "95966894-43b0-4ecf-b0e8-b56c51eda3de"
       }

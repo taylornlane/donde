@@ -109,6 +109,11 @@ export type Park = {
   states: string;
   lat: number;
   lng: number;
+  /**
+   * How many of the 63 National Parks this unit represents: 0 for anything else,
+   * 1 normally, and 2 for Sequoia & Kings Canyon, which is one unit covering two
+   * parks. Compare with `>= 1` for "is a national park", sum it for the total.
+   */
   is_national_park: number;
   is_monument: number;
 };
