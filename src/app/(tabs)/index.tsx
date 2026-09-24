@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -25,6 +25,8 @@ export default function MapScreen() {
   const countryCount = useVisitCount('country');
   const cityCount = useVisitCount('city');
   const toggle = useVisits((s) => s.toggle);
+  const onPressCity = useCallback((id: string) => toggle('city', id), [toggle]);
+  const onPressCountry = useCallback((id: string) => router.push(`/country/${id}`), []);
 
   const nearbyCities = useNearbyCities();
 
@@ -34,8 +36,8 @@ export default function MapScreen() {
         mode={mode}
         visitedCities={visitedCities}
         nearbyCities={nearbyCities.cities}
-        onPressCountry={(id) => router.push(`/country/${id}`)}
-        onPressCity={(id) => toggle('city', id)}
+        onPressCountry={onPressCountry}
+        onPressCity={onPressCity}
         onViewportChange={nearbyCities.onViewportChange}
       />
 
@@ -90,35 +92,60 @@ export default function MapScreen() {
   );
 }
 
+type Bounds = { north: number; south: number; east: number; west: number };
+
 /**
  * Loads the cities inside the current viewport so they can be browsed and ticked off.
  *
- * Debounced, because a pan fires a viewport change at the end of every gesture and a
- * flick produces several in a row. Requests are also sequence-checked: SQLite can
- * return an earlier query after a later one, and without the guard a fast pan leaves
- * the map showing cities from a region you have already left.
+ * Three guards, each for a failure this hook hit in practice:
+ *
+ * `onViewportChange` is stable. An unstable callback hands <Map> a new prop on every
+ * render, the map settles, emits another region event, and the whole thing feeds
+ * itself into a frozen app.
+ *
+ * Bounds updates that barely move are dropped. A map settling after a pan emits
+ * several near-identical regions, and re-rendering on sub-degree jitter restarts the
+ * cycle for no new information.
+ *
+ * Responses are sequence-checked. SQLite can resolve an earlier query after a later
+ * one, which would leave the map showing cities from a region already panned away.
  */
 function useNearbyCities() {
   const [cities, setCities] = useState<City[]>([]);
-  const bounds = useRef<{ north: number; south: number; east: number; west: number } | null>(null);
+  const [bounds, setBounds] = useState<Bounds | null>(null);
   const sequence = useRef(0);
-  const [tick, setTick] = useState(0);
+
+  const onViewportChange = useCallback((next: Bounds) => {
+    setBounds((prev) => {
+      if (
+        prev &&
+        Math.abs(prev.north - next.north) < 0.02 &&
+        Math.abs(prev.south - next.south) < 0.02 &&
+        Math.abs(prev.east - next.east) < 0.02 &&
+        Math.abs(prev.west - next.west) < 0.02
+      ) {
+        // Same view, as far as anyone can tell. Returning prev keeps the identity
+        // and so produces no render at all.
+        return prev;
+      }
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
-    const current = bounds.current;
-    if (!current) return;
+    if (!bounds) return;
 
-    // A whole-world viewport would match all 34k cities; the map only draws them
-    // past zoom 4.5 anyway, so skip the query entirely when zoomed out.
-    const span = Math.max(current.north - current.south, Math.abs(current.east - current.west));
+    // A whole-world viewport matches all 34k cities, and nothing is drawn below
+    // zoom 4.5 anyway, so skip the query rather than pay for it.
+    const span = Math.max(bounds.north - bounds.south, Math.abs(bounds.east - bounds.west));
     if (span > 60) {
-      setCities([]);
+      setCities((prev) => (prev.length === 0 ? prev : []));
       return;
     }
 
     const id = ++sequence.current;
     const timer = setTimeout(() => {
-      citiesInBounds(current, 250)
+      citiesInBounds(bounds, 250)
         .then((rows) => {
           if (id === sequence.current) setCities(rows);
         })
@@ -126,15 +153,9 @@ function useNearbyCities() {
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [tick]);
+  }, [bounds]);
 
-  return {
-    cities,
-    onViewportChange: (next: { north: number; south: number; east: number; west: number }) => {
-      bounds.current = next;
-      setTick((t) => t + 1);
-    },
-  };
+  return { cities, onViewportChange };
 }
 
 function ModeButton({

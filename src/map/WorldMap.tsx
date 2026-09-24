@@ -7,7 +7,7 @@ import {
   type ViewStateChangeEvent,
 } from '@maplibre/maplibre-react-native';
 import { Asset } from 'expo-asset';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, useColorScheme, View } from 'react-native';
 
 import { useMapColors } from '../hooks/use-map-colors';
@@ -102,6 +102,54 @@ export function WorldMap({
     [nearbyCities, visitedCityIds]
   );
 
+  /**
+   * Both handlers are memoised. <Map> is a native view, and handing it fresh
+   * function props on every render is what turns an ordinary state update into a
+   * feedback loop between the map settling and React re-rendering.
+   */
+  const handlePress = useCallback(
+    async (event: { nativeEvent: { point: [number, number] } }) => {
+      const [x, y] = event.nativeEvent.point;
+
+      // A finger is far bigger than a 5px dot, so query a box around the touch
+      // rather than the exact pixel — without this, city taps almost never land.
+      const TOUCH_SLOP = 14;
+      const cityHits = await mapRef.current?.queryRenderedFeatures(
+        [
+          [x - TOUCH_SLOP, y - TOUCH_SLOP],
+          [x + TOUCH_SLOP, y + TOUCH_SLOP],
+        ],
+        { layers: ['city-nearby', 'city-dot'] }
+      );
+
+      const city = cityHits?.[0]?.properties?.id;
+      if (city && onPressCity) {
+        onPressCity(String(city));
+        return;
+      }
+
+      // Nothing city-shaped under the finger, so treat it as a country tap.
+      if (!onPressCountry) return;
+      const countryHits = await mapRef.current?.queryRenderedFeatures([x, y], {
+        layers: ['country-base'],
+      });
+      const country = countryHits?.[0]?.properties?.id;
+      if (country) onPressCountry(String(country));
+    },
+    [onPressCity, onPressCountry]
+  );
+
+  const handleRegionChange = useCallback(
+    (e: { nativeEvent: { bounds?: [number, number, number, number] } }) => {
+      // GeoJSON-RFC order: [west, south, east, north].
+      const bounds = e.nativeEvent.bounds;
+      if (!bounds) return;
+      const [west, south, east, north] = bounds;
+      onViewportChange?.({ north, south, east, west });
+    },
+    [onViewportChange]
+  );
+
   const style = useMemo(() => baseStyle(scheme), [scheme]);
   const labels = useMemo(() => placeLabelLayer(scheme), [scheme]);
 
@@ -112,43 +160,9 @@ export function WorldMap({
       ref={mapRef}
       style={styles.fill}
       mapStyle={style}
-      onPress={async (event) => {
-        const [x, y] = event.nativeEvent.point;
-
-        // A finger is far bigger than a 5px dot, so query a box around the touch
-        // rather than the exact pixel — without this, city taps almost never land.
-        const TOUCH_SLOP = 14;
-        const cityHits = await mapRef.current?.queryRenderedFeatures(
-          [
-            [x - TOUCH_SLOP, y - TOUCH_SLOP],
-            [x + TOUCH_SLOP, y + TOUCH_SLOP],
-          ],
-          { layers: ['city-nearby', 'city-dot'] }
-        );
-
-        const city = cityHits?.[0]?.properties?.id;
-        if (city && onPressCity) {
-          onPressCity(String(city));
-          return;
-        }
-
-        // Nothing city-shaped under the finger, so treat it as a country tap.
-        if (!onPressCountry) return;
-        const countryHits = await mapRef.current?.queryRenderedFeatures([x, y], {
-          layers: ['country-base'],
-        });
-        const country = countryHits?.[0]?.properties?.id;
-        if (country) onPressCountry(String(country));
-      }}
-      // Fires once the gesture settles rather than on every frame of a pan, so a
-      // viewport query runs once per movement instead of sixty times a second.
-      onRegionDidChange={(e) => {
-        // GeoJSON-RFC order: [west, south, east, north].
-        const bounds = e.nativeEvent.bounds;
-        if (!bounds) return;
-        const [west, south, east, north] = bounds;
-        onViewportChange?.({ north, south, east, west });
-      }}
+      onPress={handlePress}
+      // Fires once the gesture settles rather than on every frame of a pan.
+      onRegionDidChange={handleRegionChange}
     >
       <Camera
         initialViewState={{ center: [10, 25], zoom: 1.4 }}
