@@ -55,11 +55,24 @@ progress rests on stays testable.
 **New data source → `docs/ATTRIBUTION.md` first.** GeoNames, World Bank and OSM all
 require credit. MapLibre renders the OSM attribution automatically; never disable it.
 
+## A warning that is always wrong
+
+VS Code reports `Package "@maplibre/maplibre-react-native" does not contain a valid
+config plugin — Unexpected token 'typeof'` whenever `app.json` is edited. The
+extension resolves the plugin through the package's `exports` map and lands on the
+`.d.ts` declaration instead of the JS, so it is parsing types as code. Expo's own
+loader picks the right entry: the plugin applies, and its
+`Remove MapLibre.xcframework-ios.signature` phase is in the generated Xcode project.
+
+Verify rather than re-investigate — `npx expo config --type prebuild` exiting 0 with
+empty stderr means the plugin chain is healthy no matter what the editor says.
+
 ## Checks
 
 ```bash
-npx tsc --noEmit          # app
-cd tools && npx tsc --noEmit
+npx tsc --noEmit                      # app
+cd tools && npx tsc --noEmit          # pipeline
+npx expo config --type prebuild       # config plugins resolve
 ```
 
 Both are clean. MapLibre is a native module, so the app needs `npx expo run:ios`,
