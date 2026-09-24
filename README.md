@@ -12,6 +12,21 @@ account, no server, no subscription. Nothing you record leaves your phone.
 
 Built because the existing apps either look bad or charge for the city map.
 
+<table>
+  <tr>
+    <td width="25%"><img src="assets/screenshots/mapscreenshot.png" alt="World map with visited countries filled in"></td>
+    <td width="25%"><img src="assets/screenshots/addscreenshot.png" alt="Searching for a place to record"></td>
+    <td width="25%"><img src="assets/screenshots/statsscreenshot.png" alt="Statistics screen"></td>
+    <td width="25%"><img src="assets/screenshots/badgesscreenshot.png" alt="Badges screen"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Map</sub></td>
+    <td align="center"><sub>Add</sub></td>
+    <td align="center"><sub>Stats</sub></td>
+    <td align="center"><sub>Badges</sub></td>
+  </tr>
+</table>
+
 ## What it does
 
 - **Two maps** — countries and cities, with country labels and eight colour themes
