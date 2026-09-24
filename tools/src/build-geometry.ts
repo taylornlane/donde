@@ -19,6 +19,7 @@ const SOURCE =
 
 const OUT_DIR = join(import.meta.dirname, '..', '..', 'assets', 'data');
 const OUT_PATH = join(OUT_DIR, 'countries.geojson');
+const LABELS_PATH = join(OUT_DIR, 'country-labels.geojson');
 
 /**
  * Natural Earth encodes disputed or non-sovereign entries as ISO_A2 = '-99'. The
@@ -79,9 +80,38 @@ async function main() {
   if (!output) throw new Error('mapshaper produced no output — check the command string');
   writeFileSync(OUT_PATH, output);
 
-  console.log(
-    `\n✓ ${OUT_PATH}\n  ${(statSync(OUT_PATH).size / 1e6).toFixed(2)} MB (from ${(stripped.length / 1e6).toFixed(2)} MB stripped)`
+  /*
+   * Label anchors, one point per country.
+   *
+   * A symbol layer placed directly on the polygons draws a label per polygon *part*,
+   * so Russia gets four (Kaliningrad, the mainland, Novaya Zemlya, the Kurils) and
+   * every archipelago repeats itself across the map. `-points inner` collapses each
+   * country to a single interior point, which is what the label layer wants.
+   *
+   * Derived from the simplified output rather than the source, so an anchor can never
+   * land outside the shape actually being drawn.
+   */
+  const labels = await mapshaper.applyCommands(
+    '-i out.json -points inner -o labels.json format=geojson precision=0.001',
+    { 'out.json': output }
   );
+
+  const labelOutput = labels['labels.json'];
+  if (!labelOutput) throw new Error('mapshaper produced no label points');
+  writeFileSync(LABELS_PATH, labelOutput);
+
+  const labelCount = JSON.parse(labelOutput.toString('utf8')).features.length;
+
+  console.log(
+    `\n✓ ${OUT_PATH}\n  ${(statSync(OUT_PATH).size / 1e6).toFixed(2)} MB (from ${(stripped.length / 1e6).toFixed(2)} MB stripped)` +
+      `\n✓ ${LABELS_PATH}\n  ${labelCount} label anchors · ${(statSync(LABELS_PATH).size / 1e3).toFixed(0)} KB`
+  );
+
+  if (labelCount !== features.length) {
+    console.warn(
+      `  ! ${labelCount} anchors for ${features.length} countries — labels will be missing or doubled`
+    );
+  }
 }
 
 main().catch((err) => {

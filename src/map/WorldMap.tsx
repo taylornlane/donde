@@ -64,7 +64,8 @@ export function WorldMap({
   const mapRef = useRef<MapRef>(null);
 
   const visitedCountryIds = useVisitedIds('country');
-  const countriesUri = useCountryGeometryUri();
+  const countriesUri = useBundledGeoJson(require('../../assets/data/countries.geojson'));
+  const labelsUri = useBundledGeoJson(require('../../assets/data/country-labels.geojson'));
 
   // MapLibre filters need a plain array; the store holds a Set. Recomputed only when
   // the set identity changes, which the store guarantees is per-write rather than
@@ -196,29 +197,6 @@ export function WorldMap({
           }}
         />
 
-        {/*
-          Country names, from the `name` property the pipeline now carries. Fades out
-          at the zoom where the basemap's own place labels take over, so the two label
-          sets never fight for the same space.
-        */}
-        <Layer
-          id="country-label"
-          type="symbol"
-          maxzoom={5}
-          layout={{
-            'text-field': ['get', 'name'],
-            'text-font': ['Noto Sans Regular'],
-            'text-size': ['interpolate', ['linear'], ['zoom'], 1.5, 9, 4, 14],
-            'text-max-width': 7,
-          }}
-          paint={{
-            'text-color': colors.label,
-            'text-halo-color': colors.labelHalo,
-            'text-halo-width': 1.4,
-            'text-opacity': ['interpolate', ['linear'], ['zoom'], 1.2, 0, 2, 1, 4.5, 1, 5, 0],
-          }}
-        />
-
         <Layer
           id="country-outline"
           type="line"
@@ -228,6 +206,34 @@ export function WorldMap({
           }}
         />
       </GeoJSONSource>
+
+      {/*
+        Country names ride on their own point source. A symbol layer on the polygons
+        draws one label per polygon *part*, which gives Russia four and repeats every
+        archipelago across the map; the pipeline collapses each country to a single
+        interior anchor instead.
+      */}
+      {labelsUri && (
+        <GeoJSONSource id="country-labels" data={labelsUri}>
+          <Layer
+            id="country-label"
+            type="symbol"
+            maxzoom={5}
+            layout={{
+              'text-field': ['get', 'name'],
+              'text-font': ['Noto Sans Regular'],
+              'text-size': ['interpolate', ['linear'], ['zoom'], 1.5, 9, 4, 14],
+              'text-max-width': 7,
+            }}
+            paint={{
+              'text-color': colors.label,
+              'text-halo-color': colors.labelHalo,
+              'text-halo-width': 1.4,
+              'text-opacity': ['interpolate', ['linear'], ['zoom'], 1.2, 0, 2, 1, 4.5, 1, 5, 0],
+            }}
+          />
+        </GeoJSONSource>
+      )}
 
       <GeoJSONSource id="nearby-cities" data={nearbyFeatures}>
         {/*
@@ -321,26 +327,26 @@ export function WorldMap({
 }
 
 /**
- * Resolves the bundled country polygons to a file URI once per app run.
+ * Resolves a bundled GeoJSON asset to a file URI once per app run.
  *
- * Handing MapLibre a URI rather than a parsed object means the 300KB of GeoJSON is
- * decoded natively, off the JS thread, and never occupies the bundle or the heap.
+ * Handing MapLibre a URI rather than a parsed object means the geometry is decoded
+ * natively, off the JS thread, and never occupies the JS heap.
  */
-function useCountryGeometryUri(): string | null {
+function useBundledGeoJson(moduleId: number): string | null {
   const [uri, setUri] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    Asset.fromModule(require('../../assets/data/countries.geojson'))
+    Asset.fromModule(moduleId)
       .downloadAsync()
       .then((asset) => {
         if (!cancelled) setUri(asset.localUri ?? asset.uri);
       })
-      .catch((err) => console.warn('Failed to load country geometry', err));
+      .catch((err) => console.warn('Failed to load bundled geometry', err));
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [moduleId]);
 
   return uri;
 }
